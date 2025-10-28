@@ -6,7 +6,7 @@ import pandas as pd
 
 class API :
 
-    def __init__(self, subject) :
+    def __init__(self, subject, file_path = None) :
         """
         """
         self.subject = subject
@@ -47,7 +47,6 @@ class API :
         dfReddit = pd.DataFrame(redditDocs, columns=['Texte'])
         dfReddit['ID'] = range(1, len(dfReddit) + 1)
         dfReddit['Origine'] = "Reddit"
-        print(len(dfReddit))
         dfArxiv = pd.DataFrame(arxivDoc, columns=['Texte'])
         dfArxiv['ID'] = range(len(dfReddit) + 1, len(dfArxiv) + len(dfReddit) + 1)
         dfArxiv['Origine'] = "Arxiv"
@@ -59,9 +58,20 @@ class API :
     def getDocs(self) :
         return self.docs
 
-    def saveDocsCSV(self, path : str) :
-        self.docs.to_csv(path, index=False)
+    def saveDocsCSV(self, folder: str) :
+        self.docs.to_csv(folder + f"/{self.subject}.csv", index=False)
+
+    def getNbDocs(self) :
+        return len(self.docs)
+    
+    def seeNbWordsDocs(self) :
+        for i in self.docs['Texte'] :
+            print(len(i.split(" ")))
+
+    def clearDocsByNumberOfWords(self, nbWordsMin: int):
+        self.docs = self.docs[self.docs['Texte'].apply(lambda x: len(x.split()) >= nbWordsMin)]
+        return self.docs
+
+
     
 API = API("Quantum")
-print(API.getDocs())
-API.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output/docs.csv")
