@@ -54,10 +54,14 @@ class API :
         df = pd.concat([dfReddit, dfArxiv])
 
 
-        return dfReddit
+        return df
     
     def getDocs(self) :
         return self.docs
+
+    def saveDocsCSV(self, path : str) :
+        self.docs.to_csv(path, index=False)
     
 API = API("Quantum")
 print(API.getDocs())
+API.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output/docs.csv")
