@@ -14,9 +14,9 @@ class Corpus :
         """
         self.subject = subject
         if (file_path) :
-            self.docs = self.__getdocsWithCSV(file_path)
+            self.docs = self.__getdocsWithCSV(file_path) # A reparer suite au changement de SDD
         else :
-            self.docs = self.__getDocsWithSubject(self.subject)
+            self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
 
 
     def __getDocsWithSubject(self, subject: str) :
@@ -70,7 +70,7 @@ class Corpus :
             documents[id] = doc
             id += 1
 
-        return documents
+        return (documents, authors, len(documents))
     
     def __getdocsWithCSV(self, file_path) :
         df = pd.read_csv(file_path)
@@ -82,20 +82,44 @@ class Corpus :
         return self.docs
 
     def saveDocsCSV(self, folder: str) :
-        self.docs.to_csv(folder + f"/{self.subject}.csv", index=False)
+        df = self.DocstoDataframe()
+        df.to_csv(folder + f"/{self.subject}.csv", index=False)
 
     def getNbDocs(self) :
-        return len(self.docs)
+        return self.nb_docs
     
     def seeNbWordsDocs(self) :
-        for i in self.docs['Texte'] :
+        df = self.DocstoDataframe()
+        for i in df['Texte'] :
             print(len(i.split(" ")))
 
     def clearDocsByNumberOfWords(self, nbWordsMin: int):
-        self.docs = self.docs[self.docs['Texte'].apply(lambda x: len(x.split()) >= nbWordsMin)]
+        df = self.DocstoDataframe()
+        df = df[df['Texte'].apply(lambda x: len(x.split()) >= nbWordsMin)]
         return self.docs
+    
+    def showDocs(self, limit = -1) :
+        if (limit == -1) :
+            for i in self.docs :
+                print(i)
+        else :
+            nb = 0
+            while nb < limit :
+                print(self.docs[i])
+
+    def DocstoDataframe(self) :
+        df = pd.DataFrame(
+        [vars(doc) for doc in self.docs.values()],  # récupère tous les attributs des objets
+        index=self.docs.keys()                      # garde les ID comme index
+         )
+
+        return df
 
 
     
 Corpus = Corpus("Quantum")
-print(Corpus.getDocs())
+print(Corpus.DocstoDataframe().tail)
+Corpus.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output")
+
+# TODO : TD4, 3.2
+
