@@ -2,7 +2,7 @@ import praw
 import arxiv
 import urllib
 import xmltodict
-from pandas import *
+import pandas as pd
 
 class API :
 
@@ -13,7 +13,7 @@ class API :
         self.docs = self.__getDocsWithSubject(self.subject)
 
 
-    def __getDocsWithSubject(self, subject) :
+    def __getDocsWithSubject(self, subject: str) :
         """
         INFO :
             Générer une liste de liste qui contient à l'index 0 les document de reddit et à l'index 1 les documents de Arxiv
@@ -44,7 +44,17 @@ class API :
             summary = entry['summary'].replace('\n', ' ')
             arxivDoc.append(summary)
 
-        return [redditDocs, arxivDoc]
+        dfReddit = pd.DataFrame(redditDocs, columns=['Texte'])
+        dfReddit['ID'] = range(1, len(dfReddit) + 1)
+        dfReddit['Origine'] = "Reddit"
+        print(len(dfReddit))
+        dfArxiv = pd.DataFrame(arxivDoc, columns=['Texte'])
+        dfArxiv['ID'] = range(len(dfReddit) + 1, len(dfArxiv) + len(dfReddit) + 1)
+        dfArxiv['Origine'] = "Arxiv"
+        df = pd.concat([dfReddit, dfArxiv])
+
+
+        return dfReddit
     
     def getDocs(self) :
         return self.docs
