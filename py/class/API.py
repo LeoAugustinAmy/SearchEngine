@@ -3,6 +3,8 @@ import arxiv
 import urllib
 import xmltodict
 import pandas as pd
+from Document import Document
+import datetime
 
 class API :
 
@@ -25,17 +27,22 @@ class API :
         OUTPUT :
             (tab) --> le tableau qui contient les documents des 2 appels API
         """
-        # praw --> the docs from reddit are in index 0 of the final tab
-        redditDocs = []
+
+        documents = {}
+        id = 0
+
+        # reddit
         redditConnection = praw.Reddit(client_id='3nZXcVfR162w5Yrcu6WkDQ', client_secret='Zyc2pI0jCgW4Cx6v4RTznsouqvXU7A', user_agent='SearchEngine')
 
         hotPosts = redditConnection.subreddit(subject).hot(limit=100)
         for post in hotPosts:
             text = post.selftext.replace('\n', ' ')
             if text:
-                redditDocs.append(text)
+                doc = Document(post.title, [post.author.name] if post.author else "Inconnu", post.created_utc, post.url, text)
+                documents[id] = doc
+                id += 1
 
-        # Arxiv --> the docs from Arxiv are in index 1 of the final tab
+        # Arxiv
         arxivDoc = []
         url = f'http://export.arxiv.org/api/query?search_query=all:{subject}&start=0&max_results=300'
         urlRead = urllib.request.urlopen(url).read()
@@ -43,19 +50,12 @@ class API :
 
         parsedData = xmltodict.parse(data)
 
-        for entry in parsedData['feed']['entry']:
-            summary = entry['summary'].replace('\n', ' ')
-            arxivDoc.append(summary)
+        for entry in parsedData['feed']['entry'] :
+            doc = Document(entry['title'], entry.get('author', {}), entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '))
+            documents[id] = doc
+            id += 1
 
-        dfReddit = pd.DataFrame(redditDocs, columns=['Texte'])
-        dfReddit['ID'] = range(1, len(dfReddit) + 1)
-        dfReddit['Origine'] = "Reddit"
-        dfArxiv = pd.DataFrame(arxivDoc, columns=['Texte'])
-        dfArxiv['ID'] = range(len(dfReddit) + 1, len(dfArxiv) + len(dfReddit) + 1)
-        dfArxiv['Origine'] = "Arxiv"
-        df = pd.concat([dfReddit, dfArxiv])
-
-        return df
+        return documents
     
     def __getdocsWithCSV(self, file_path) :
         df = pd.read_csv(file_path)
@@ -82,4 +82,5 @@ class API :
 
 
     
-API = API("Quantum", "C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output/Quantum.csv")
+API = API("Quantum")
+print(API.getDocs())
