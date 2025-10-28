@@ -5,8 +5,9 @@ import xmltodict
 import pandas as pd
 from Document import Document
 import datetime
+from Author import Author
 
-class API :
+class Corpus :
 
     def __init__(self, subject, file_path = None) :
         """
@@ -28,6 +29,7 @@ class API :
             (tab) --> le tableau qui contient les documents des 2 appels API
         """
 
+        authors = {}
         documents = {}
         id = 0
 
@@ -38,7 +40,11 @@ class API :
         for post in hotPosts:
             text = post.selftext.replace('\n', ' ')
             if text:
-                doc = Document(post.title, [post.author.name] if post.author else "Inconnu", post.created_utc, post.url, text)
+                author_name = post.author.name if post.author else "Inconnu"
+                print(author_name)
+                doc = Document(post.title, author_name, post.created_utc, post.url, text)
+                if (author_name != "Inconnu") and not(author_name in authors) :
+                    authors[author_name] = Author(author_name)
                 documents[id] = doc
                 id += 1
 
@@ -51,7 +57,16 @@ class API :
         parsedData = xmltodict.parse(data)
 
         for entry in parsedData['feed']['entry'] :
-            doc = Document(entry['title'], entry.get('author', {}), entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '))
+            authors_list = entry.get('author', {})
+            if isinstance(authors_list, list):
+                for i in authors_list :
+                    if not(i['name'] in authors) :
+                        authors[i['name']] = Author(i['name'])
+            else :
+                if not(authors_list['name'] in authors) :
+                    authors[authors_list['name']] = Author(authors_list['name'])
+
+            doc = Document(entry['title'],authors_list, entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '))
             documents[id] = doc
             id += 1
 
@@ -82,5 +97,5 @@ class API :
 
 
     
-API = API("Quantum")
-print(API.getDocs())
+Corpus = Corpus("Quantum")
+print(Corpus.getDocs())
