@@ -10,7 +10,10 @@ class API :
         """
         """
         self.subject = subject
-        self.docs = self.__getDocsWithSubject(self.subject)
+        if (file_path) :
+            self.docs = self.__getdocsWithCSV(file_path)
+        else :
+            self.docs = self.__getDocsWithSubject(self.subject)
 
 
     def __getDocsWithSubject(self, subject: str) :
@@ -52,9 +55,14 @@ class API :
         dfArxiv['Origine'] = "Arxiv"
         df = pd.concat([dfReddit, dfArxiv])
 
-
         return df
     
+    def __getdocsWithCSV(self, file_path) :
+        df = pd.read_csv(file_path)
+        print(f"Fichier chargé avec succès : {len(df)} lignes")
+
+        return df
+
     def getDocs(self) :
         return self.docs
 
@@ -74,4 +82,4 @@ class API :
 
 
     
-API = API("Quantum")
+API = API("Quantum", "C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output/Quantum.csv")
