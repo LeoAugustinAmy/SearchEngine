@@ -3,7 +3,7 @@ import arxiv
 import urllib
 import xmltodict
 import pandas as pd
-from Document import Document
+from Document import *
 import datetime
 from Author import Author
 
@@ -17,6 +17,7 @@ class Corpus :
             self.docs = self.__getdocsWithCSV(file_path) # A reparer suite au changement de SDD
         else :
             self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
+        self.last_id = 0
 
 
     def __getDocsWithSubject(self, subject: str) :
@@ -41,8 +42,7 @@ class Corpus :
             text = post.selftext.replace('\n', ' ')
             if text:
                 author_name = post.author.name if post.author else "Inconnu"
-                print(author_name)
-                doc = Document(post.title, author_name, post.created_utc, post.url, text)
+                doc = RedditDocument(post.title, author_name, post.created_utc, post.url, text, post.num_comments)
                 if (author_name != "Inconnu") and not(author_name in authors) :
                     authors[author_name] = Author(author_name)
                 documents[id] = doc
@@ -58,15 +58,27 @@ class Corpus :
 
         for entry in parsedData['feed']['entry'] :
             authors_list = entry.get('author', {})
+            auteur_principal = None
+            co_auteur = []
             if isinstance(authors_list, list):
+                first_time = True
                 for i in authors_list :
                     if not(i['name'] in authors) :
                         authors[i['name']] = Author(i['name'])
+                    if not(first_time) :
+                        co_auteur.append(Author(i['name']))
+                    first_time = False
+                        
             else :
+                auteur_principal = Author(authors_list['name'])
                 if not(authors_list['name'] in authors) :
-                    authors[authors_list['name']] = Author(authors_list['name'])
+                    authors[authors_list['name']] = auteur_principal
 
-            doc = Document(entry['title'],authors_list, entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '))
+            if co_auteur == [] :
+                co_auteur = "Aucun co-auteur(s)"
+
+            print(co_auteur)
+            doc = ArxivDocument(entry['title'],auteur_principal, entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '), co_auteur)
             documents[id] = doc
             id += 1
 
@@ -121,5 +133,5 @@ Corpus = Corpus("Quantum")
 print(Corpus.DocstoDataframe().tail)
 Corpus.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output")
 
-# TODO : TD4, 3.2
+# TODO : TD4, 3.2 et utiliser pickle pour save le corpus plutot qu'excel et ajouter au corpus le last_id_doc et gerer les timestamps
 

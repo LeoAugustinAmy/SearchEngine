@@ -9,7 +9,7 @@ class Author :
         self.nb_docs += 1
 
     def __str__(self):
-        print(f"Auteur : {self.name} | production : {self.production}")
+        return f"Auteur : {self.name} | production : {self.production}"
 
     def getNbDocs(self) :
         return self.nb_docs
