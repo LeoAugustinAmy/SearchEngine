@@ -19,6 +19,7 @@ class Corpus :
         else :
             self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
         self.last_id = 0
+        self.textOnOneLine = self.getOneLineOfText()
 
 
     def __getDocsWithSubject(self, subject: str) :
@@ -78,7 +79,6 @@ class Corpus :
             if co_auteur == [] :
                 co_auteur = "Aucun co-auteur(s)"
 
-            print(co_auteur)
             doc = ArxivDocument(entry['title'],auteur_principal, entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '), co_auteur)
             documents[id] = doc
             id += 1
@@ -131,10 +131,54 @@ class Corpus :
 # ===================== From here, function to add to TD 1 =====================
 
     def getOneLineOfText(self) :
+        """
+        INFO :
+            Genère un seul string à partir de tout les textes récupérer depuis l'API
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+        OUTPUT :
+            (str) --> Une chaine de caractère qui contient un join de tout les textes
+        """
         textes = [doc.texte for doc in self.docs.values()]
         return "".join(textes)
 
 # ===================== From here, function for TD 2 =====================
 
+    def search(self, find) :
+        """
+        INFO :
+            recherche dans une chaine de caractere un motif en particulier
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            find (str) --> chainde de caractere à rechercher
+        OUTPUT :
+            (tab) --> un tableau qui contient tout les passages ou apparait find
+        """
+        phrases = re.split(r'(?<=[.!?])\s+', self.textOnOneLine)
+
+        pattern = rf"\b{re.escape(find)}\b"
+
+        results = [p for p in phrases if re.search(pattern, p, flags=re.IGNORECASE)]
+
+        return results
+
+    def concorde(self, find, contexte=30):
+        """
+        INFO :
+            Construit un concordancier : contexte gauche, motif trouvé, contexte droit.
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            find (str) --> chainde de caractere à rechercher
+            contexte (int) --> le nombre de caractere à prendre autour du str find
+        OUTPUT :
+            (DataFrame) --> un dtaaframe pandas avec 3 colonnes
+        """
+        pattern = rf"(.{{0,{contexte}}})\b({re.escape(find)})\b(.{{0,{contexte}}})"
+
+        matches = re.findall(pattern, self.textOnOneLine, flags=re.IGNORECASE)
+
+        df = pd.DataFrame(matches, columns=["contexte_gauche", "motif", "contexte_droit"])
+        return df
+
 corpus = Corpus("Quantum")
-print(corpus.getOneLineOfText())
+print(corpus.concorde("epsilon-simulation"), 60)
