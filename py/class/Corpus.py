@@ -128,10 +128,8 @@ class Corpus :
         return df
 
 
-    
 Corpus = Corpus("Quantum")
 print(Corpus.DocstoDataframe().tail)
 Corpus.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output")
 
-# TODO : TD4, 3.2 et utiliser pickle pour save le corpus plutot qu'excel et ajouter au corpus le last_id_doc et gerer les timestamps
-
+# TODO : TD4, 3.2 et ajouter au corpus le last_id_doc et gerer les timestamps
