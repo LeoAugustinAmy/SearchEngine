@@ -180,5 +180,81 @@ class Corpus :
         df = pd.DataFrame(matches, columns=["contexte_gauche", "motif", "contexte_droit"])
         return df
 
+    def nettoyer_texte(self, texte):
+        """
+        INFO :
+            Nettoie un texte : minuscules, supprime ponctuation, chiffres, sauts de ligne.
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            texte (str) --> Le texte à nettoyer
+        OUTPUT :
+            (DataFrame) --> Un dtaaframe pandas avec 3 colonnes
+        """
+        texte = texte.lower()
+        texte = texte.replace("\n", " ")
+        texte = re.sub(r"[^\w\s]", " ", texte)  # retire la ponctuation
+        texte = re.sub(r"\d+", " ", texte)       # retire les chiffres
+        texte = re.sub(r"\s+", " ", texte)       # espaces multiples --> un seul
+        return texte.strip()
+
+    def construire_vocabulaire(self):
+        """
+        INFO :
+            Construit le vocabulaire (ensemble des mots uniques du corpus)
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+        OUTPUT :
+            (Set) --> X
+        """
+        vocab = set()
+
+        for doc in self.docs.values():
+            propre = self.nettoyer_texte(doc.texte)
+            mots = propre.split() 
+            vocab.update(mots)
+
+        return vocab
+
+    def stats(self, n=20):
+        """
+        INFO :
+            Affiche en console des statistiques clefs
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            n (int) --> Sert à l'affichage uniquement, affiche les n mots les plus presents
+        """
+
+        vocab = {}
+        doc_freq = {}
+
+        for doc in self.docs.values():
+            propre = self.nettoyer_texte(doc.texte)
+            mots = propre.split()
+
+            mots_uniques_doc = set(mots)
+
+            for m in mots:
+                vocab[m] = vocab.get(m, 0) + 1
+
+            for m in mots_uniques_doc:
+                doc_freq[m] = doc_freq.get(m, 0) + 1
+
+        df = pd.DataFrame({
+            "mot": list(vocab.keys()),
+            "term_frequency": list(vocab.values()),
+            "document_frequency": [doc_freq[m] for m in vocab.keys()]
+        })
+
+        df = df.sort_values(by="term_frequency", ascending=False)
+
+        print("Nombre de mots différents :", len(df))
+        print(f"\nTop {n} mots les plus fréquents :")
+        print(df.head(n))
+
+        return df
+
+
+
+
 corpus = Corpus("Quantum")
-print(corpus.concorde("epsilon-simulation"), 60)
+print(corpus.stats(50))
