@@ -6,6 +6,7 @@ import pandas as pd
 from Document import *
 import datetime
 from Author import Author
+import re
 
 class Corpus :
 
@@ -68,7 +69,7 @@ class Corpus :
                     if not(first_time) :
                         co_auteur.append(Author(i['name']))
                     first_time = False
-                        
+
             else :
                 auteur_principal = Author(authors_list['name'])
                 if not(authors_list['name'] in authors) :
@@ -83,7 +84,7 @@ class Corpus :
             id += 1
 
         return (documents, authors, len(documents))
-    
+
     def __getdocsWithCSV(self, file_path) :
         df = pd.read_csv(file_path)
         print(f"Fichier chargé avec succès : {len(df)} lignes")
@@ -99,7 +100,7 @@ class Corpus :
 
     def getNbDocs(self) :
         return self.nb_docs
-    
+
     def seeNbWordsDocs(self) :
         df = self.DocstoDataframe()
         for i in df['Texte'] :
@@ -109,7 +110,7 @@ class Corpus :
         df = self.DocstoDataframe()
         df = df[df['Texte'].apply(lambda x: len(x.split()) >= nbWordsMin)]
         return self.docs
-    
+
     def showDocs(self, limit = -1) :
         if (limit == -1) :
             for i in self.docs :
@@ -127,9 +128,13 @@ class Corpus :
 
         return df
 
+# ===================== From here, function to add to TD 1 =====================
 
-Corpus = Corpus("Quantum")
-print(Corpus.DocstoDataframe().tail)
-Corpus.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output")
+    def getOneLineOfText(self) :
+        textes = [doc.texte for doc in self.docs.values()]
+        return "".join(textes)
 
-# TODO : TD4, 3.2 et ajouter au corpus le last_id_doc et gerer les timestamps
+# ===================== From here, function for TD 2 =====================
+
+corpus = Corpus("Quantum")
+print(corpus.getOneLineOfText())
