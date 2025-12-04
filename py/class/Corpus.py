@@ -210,7 +210,7 @@ class Corpus :
 
         for doc in self.docs.values():
             propre = self.nettoyer_texte(doc.texte)
-            mots = propre.split() 
+            mots = propre.split()
             vocab.update(mots)
 
         return vocab
@@ -252,9 +252,3 @@ class Corpus :
         print(df.head(n))
 
         return df
-
-
-
-
-corpus = Corpus("Quantum")
-print(corpus.stats(50))
