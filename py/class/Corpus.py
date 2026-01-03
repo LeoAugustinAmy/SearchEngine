@@ -5,25 +5,27 @@ import xmltodict
 import pandas as pd
 from Document import *
 import datetime
+import json
 from Author import Author
 
 class Corpus :
-
-    def __init__(self, subject, file_path = None) :
+    def __init__(self, subject, file_path=None):
         """
+        Initialise le corpus. Charge depuis un JSON si file_path est fourni,
+        sinon interroge les API.
         """
         self.subject = subject
-        if (file_path) :
-            self.docs = self.__getdocsWithCSV(file_path) # A reparer suite au changement de SDD
-        else :
+        self.authors = {}
+        self.docs = {}
+        if file_path:
+            self.load_json(file_path)
+        else:
             self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
-        self.last_id = 0
 
 
     def __getDocsWithSubject(self, subject: str) :
         """
-        INFO :
-            Générer une liste de liste qui contient à l'index 0 les document de reddit et à l'index 1 les documents de Arxiv
+        Générer une liste de liste qui contient à l'index 0 les document de reddit et à l'index 1 les documents de Arxiv.
         INPUT :
             subject (str) --> le sujet rechercher par l'API
         OUTPUT :
@@ -68,7 +70,6 @@ class Corpus :
                     if not(first_time) :
                         co_auteur.append(Author(i['name']))
                     first_time = False
-                        
             else :
                 auteur_principal = Author(authors_list['name'])
                 if not(authors_list['name'] in authors) :
@@ -77,29 +78,114 @@ class Corpus :
             if co_auteur == [] :
                 co_auteur = "Aucun co-auteur(s)"
 
-            print(co_auteur)
             doc = ArxivDocument(entry['title'],auteur_principal, entry.get('published'), entry.get('id'), entry['summary'].replace('\n', ' '), co_auteur)
             documents[id] = doc
             id += 1
 
         return (documents, authors, len(documents))
-    
-    def __getdocsWithCSV(self, file_path) :
-        df = pd.read_csv(file_path)
-        print(f"Fichier chargé avec succès : {len(df)} lignes")
 
-        return df
+    def save_json(self, file_path):
+        """
+        Sauvegarde le dictionnaire de documents au format JSON.
+        INPUT :
+            file_path (str)
+        """
+        # On transforme chaque objet Document en dictionnaire pour le rendre sérialisable
+        data_to_save = {}
+
+        for i, doc in self.docs.items():
+            # On récupère les attributs de l'objet Document
+            doc_dict = vars(doc).copy()
+
+            # Simple auteur
+            if hasattr(doc.auteur, 'name'):
+                doc_dict['auteur'] = doc.auteur.name
+            data_to_save[str(i)] = doc_dict
+
+            # Co auteur
+            if 'co_auteur' in doc_dict and isinstance(doc_dict['co_auteur'], list):
+                # On remplace chaque objet Author de la liste par son nom
+                doc_dict['co_auteur'] = [
+                    a.name if hasattr(a, 'name') else str(a) 
+                    for a in doc_dict['co_auteur']
+                ]
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data_to_save, f, ensure_ascii=False, indent=4)
+        print(f"Corpus sauvegardé en JSON : {file_path}")
+
+    def load_json(self, file_path):
+        """
+        Charge un corpus depuis un JSON où les documents sont à la racine.
+        INPUT :
+            file_path (str)
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            self.docs = {}
+            self.authors = {}
+
+            # On boucle directement sur les clés du dictionnaire chargé
+            for idx, d in data.items():
+                # On ignore les éventuelles méta-données comme 'subject'
+                if not idx.isdigit() and idx == "subject":
+                    self.subject = d
+                    continue
+
+                # 1. Reconstruction de l'Auteur
+                author_name = d.get('auteur', 'Inconnu')
+                if author_name not in self.authors:
+                    self.authors[author_name] = Author(author_name)
+                author_obj = self.authors[author_name]
+
+                # 2. Reconstruction du Document selon le type
+                doc_type = d.get('type')
+
+                if doc_type == "Reddit":
+                    new_doc = RedditDocument(
+                        titre=d.get('titre'),
+                        auteur=author_name,
+                        date=d.get('date'),
+                        url=d.get('url'),
+                        texte=d.get('texte'),
+                        nb_comment=d.get('nb_comment', 0)
+                    )
+                elif doc_type == "Arxiv":
+                    new_doc = ArxivDocument(
+                        titre=d.get('titre'),
+                        auteur=author_name,
+                        date=d.get('date'),
+                        url=d.get('url'),
+                        texte=d.get('texte'),
+                        co_auteur=d.get('co_auteur', [])
+                    )
+                else:
+                    new_doc = Document(
+                        titre=d.get('titre'),
+                        auteur=author_name,
+                        date=d.get('date'),
+                        url=d.get('url'),
+                        texte=d.get('texte')
+                    )
+
+                # 3. Stockage et liaison avec l'auteur
+                self.docs[int(idx)] = new_doc
+                author_obj.add(new_doc)
+
+            self.nb_docs = len(self.docs)
+            print(f"Chargement réussi : {self.nb_docs} documents chargés.")
+
+        except FileNotFoundError:
+            print("Erreur : Le fichier est introuvable.")
 
     def getDocs(self) :
         return self.docs
 
-    def saveDocsCSV(self, folder: str) :
-        df = self.DocstoDataframe()
-        df.to_csv(folder + f"/{self.subject}.csv", index=False)
-
     def getNbDocs(self) :
         return self.nb_docs
-    
+
     def seeNbWordsDocs(self) :
         df = self.DocstoDataframe()
         for i in df['Texte'] :
@@ -109,7 +195,7 @@ class Corpus :
         df = self.DocstoDataframe()
         df = df[df['Texte'].apply(lambda x: len(x.split()) >= nbWordsMin)]
         return self.docs
-    
+
     def showDocs(self, limit = -1) :
         if (limit == -1) :
             for i in self.docs :
@@ -123,13 +209,34 @@ class Corpus :
         df = pd.DataFrame(
         [vars(doc) for doc in self.docs.values()],  # récupère tous les attributs des objets
         index=self.docs.keys()                      # garde les ID comme index
-         )
+        )
 
         return df
 
+    def sort_by_date(self, n=10):
+        """
+        Affiche les n documents les plus récents.
+        """
+        # On force la comparaison en texte pour éviter l'erreur float/str
+        sorted_docs = sorted(self.docs.values(), key=lambda x: str(x.date), reverse=True)
+        for doc in sorted_docs[:n]:
+            print(doc)
 
-Corpus = Corpus("Quantum")
-print(Corpus.DocstoDataframe().tail)
-Corpus.saveDocsCSV("C:/Users/leoam/Desktop/M1/programmation de spécialité/SearchEngine/py/output")
+    def sort_by_title(self, n=10):
+        """
+        Affiche les n premiers documents triés par titre.
+        """
+        sorted_docs = sorted(self.docs.values(), key=lambda x: x.titre)
+        for doc in sorted_docs[:n]:
+            print(doc)
 
-# TODO : TD4, 3.2 et ajouter au corpus le last_id_doc et gerer les timestamps
+    def __repr__(self):
+        """
+        Fournit une représentation du corpus.
+        OUTPUT : (str)
+        """
+        return f"Corpus(sujet='{self.subject}', nb_documents={len(self.docs)}, nb_auteurs={len(self.authors)})"
+
+
+my_corpus = Corpus("Quantum")
+print(f"Représentation du corpus : {my_corpus}")
