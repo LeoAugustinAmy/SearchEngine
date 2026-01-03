@@ -4,23 +4,36 @@ import urllib
 import xmltodict
 import pandas as pd
 from Document import *
-import datetime
 import json
 from Author import Author
+import re
 
 class Corpus :
-    def __init__(self, subject, file_path=None):
-        """
-        Initialise le corpus. Charge depuis un JSON si file_path est fourni,
-        sinon interroge les API.
-        """
+    def __init__(self, subject, file_path=None, dataframe=None):
         self.subject = subject
         self.authors = {}
         self.docs = {}
+        self.last_id = 0 # Initialisation de l'ID
+
         if file_path:
             self.load_json(file_path)
+        elif dataframe is not None:
+            self.nb_docs = 0
+            print(f"Corpus '{subject}' initialisé vide pour chargement CSV.")
         else:
+            # Cas par défaut : recherche API
             self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
+
+        if self.docs:
+            self.textOnOneLine = self.getOneLineOfText()
+        else:
+            self.textOnOneLine = ""
+
+    # Ajoute aussi cette petite méthode pour faciliter l'ajout manuel
+    def add(self, doc):
+        self.docs[self.last_id] = doc
+        self.last_id += 1
+        self.nb_docs = len(self.docs)
 
 
     def __getDocsWithSubject(self, subject: str) :
@@ -70,6 +83,7 @@ class Corpus :
                     if not(first_time) :
                         co_auteur.append(Author(i['name']))
                     first_time = False
+
             else :
                 auteur_principal = Author(authors_list['name'])
                 if not(authors_list['name'] in authors) :
@@ -213,6 +227,140 @@ class Corpus :
 
         return df
 
+    def getOneLineOfText(self) :
+        """
+        INFO :
+            Genère un seul string à partir de tout les textes récupérer depuis l'API
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+        OUTPUT :
+            (str) --> Une chaine de caractère qui contient un join de tout les textes
+        """
+        textes = [doc.texte for doc in self.docs.values()]
+        return "".join(textes)
+
+    def search(self, mots, k=5) :
+        """
+        INFO :
+            recherche dans une chaine de caractere un motif en particulier
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            find (str) --> chainde de caractere à rechercher
+        OUTPUT :
+            (tab) --> un tableau qui contient tout les passages ou apparait find
+        """
+        vq = self.__query_to_vector(mots)
+        scores = []
+
+        # On parcourt les lignes de la matrice TF-IDF
+        for i in range(self.nb_docs):
+            vd = self.mat_TFIDF.getrow(i)
+            s = self.__cosinus(vq, vd)
+            scores.append(s)
+
+        # Création du DataFrame de résultats
+        results = pd.DataFrame({
+            "titre": [doc.titre for doc in self.docs.values()],
+            "score": scores
+        })
+
+        # Tri par score décroissant et retour des k meilleurs
+        return results.sort_values(by="score", ascending=False).head(k)
+
+    def concorde(self, expression, contexte=30):
+        """
+        Construit un concordancier (TD6 1.2).
+        """
+        if not hasattr(self, 'textOnOneLine'):
+            self.textOnOneLine = " ".join([d.texte for d in self.docs.values()])
+
+        # On cherche l'expression avec re.finditer
+        pattern = re.compile(f"(.{{0,{contexte}}})({expression})(.{{0,{contexte}}})")
+        matches = pattern.finditer(self.textOnOneLine)
+
+        res = []
+        for m in matches:
+            res.append({
+                "contexte gauche": m.group(1),
+                "motif trouvé": m.group(2),
+                "contexte droit": m.group(3)
+            })
+        return pd.DataFrame(res)
+
+    def nettoyer_texte(self, texte):
+        """
+        Nettoie le texte selon les consignes du TD6.
+        INPUT :
+            texte (str)
+        OUTPUT :
+            texte nettoyé (str)
+        """
+        # 1. Mise en minuscules
+        texte = texte.lower()
+        # 2. Remplacement des passages à la ligne par des espaces
+        texte = texte.replace('\n', ' ')
+        # 3. Suppression de la ponctuation et des chiffres
+        texte = re.sub(r'[^a-z\s]', '', texte)
+        # 4. Suppression des espaces multiples
+        texte = re.sub(r'\s+', ' ', texte).strip()
+        return texte
+
+    def construire_vocabulaire(self):
+        """
+        INFO :
+            Construit le vocabulaire (ensemble des mots uniques du corpus)
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+        OUTPUT :
+            (Set) --> X
+        """
+        vocab = set()
+
+        for doc in self.docs.values():
+            propre = self.nettoyer_texte(doc.texte)
+            mots = propre.split()
+            vocab.update(mots)
+
+        return vocab
+
+    def stats(self, n=20):
+        """
+        INFO :
+            Affiche en console des statistiques clefs
+        INPUT :
+            self (Corpus) --> Objet qui contient tout les documents
+            n (int) --> Sert à l'affichage uniquement, affiche les n mots les plus presents
+        """
+
+        vocab = {}
+        doc_freq = {}
+
+        for doc in self.docs.values():
+            propre = self.nettoyer_texte(doc.texte)
+            mots = propre.split()
+
+            mots_uniques_doc = set(mots)
+
+            for m in mots:
+                vocab[m] = vocab.get(m, 0) + 1
+
+            for m in mots_uniques_doc:
+                doc_freq[m] = doc_freq.get(m, 0) + 1
+
+        df = pd.DataFrame({
+            "mot": list(vocab.keys()),
+            "term_frequency": list(vocab.values()),
+            "document_frequency": [doc_freq[m] for m in vocab.keys()]
+        })
+
+        df = df.sort_values(by="term_frequency", ascending=False)
+
+        print("Nombre de mots différents :", len(df))
+        print(f"\nTop {n} mots les plus fréquents :")
+        print(df.head(n))
+
+        return df
+
     def sort_by_date(self, n=10):
         """
         Affiche les n documents les plus récents.
@@ -233,10 +381,7 @@ class Corpus :
     def __repr__(self):
         """
         Fournit une représentation du corpus.
-        OUTPUT : (str)
+        OUTPUT :
+            (str)
         """
         return f"Corpus(sujet='{self.subject}', nb_documents={len(self.docs)}, nb_auteurs={len(self.authors)})"
-
-
-my_corpus = Corpus("Quantum")
-print(f"Représentation du corpus : {my_corpus}")
