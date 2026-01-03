@@ -4,7 +4,6 @@ import urllib
 import xmltodict
 import pandas as pd
 from Document import *
-import datetime
 import json
 from Author import Author
 import re
@@ -217,8 +216,6 @@ class Corpus :
 
         return df
 
-# ===================== From here, function to add to TD 1 =====================
-
     def getOneLineOfText(self) :
         """
         INFO :
@@ -231,9 +228,7 @@ class Corpus :
         textes = [doc.texte for doc in self.docs.values()]
         return "".join(textes)
 
-# ===================== From here, function for TD 2 =====================
-
-    def search(self, find) :
+    def search(self, mots, k=5) :
         """
         INFO :
             recherche dans une chaine de caractere un motif en particulier
@@ -243,48 +238,61 @@ class Corpus :
         OUTPUT :
             (tab) --> un tableau qui contient tout les passages ou apparait find
         """
-        phrases = re.split(r'(?<=[.!?])\s+', self.textOnOneLine)
+        vq = self.__query_to_vector(mots)
+        scores = []
 
-        pattern = rf"\b{re.escape(find)}\b"
+        # On parcourt les lignes de la matrice TF-IDF
+        for i in range(self.nb_docs):
+            vd = self.mat_TFIDF.getrow(i)
+            s = self.__cosinus(vq, vd)
+            scores.append(s)
 
-        results = [p for p in phrases if re.search(pattern, p, flags=re.IGNORECASE)]
+        # Création du DataFrame de résultats
+        results = pd.DataFrame({
+            "titre": [doc.titre for doc in self.docs.values()],
+            "score": scores
+        })
 
-        return results
+        # Tri par score décroissant et retour des k meilleurs
+        return results.sort_values(by="score", ascending=False).head(k)
 
-    def concorde(self, find, contexte=30):
+    def concorde(self, expression, contexte=30):
         """
-        INFO :
-            Construit un concordancier : contexte gauche, motif trouvé, contexte droit.
-        INPUT :
-            self (Corpus) --> Objet qui contient tout les documents
-            find (str) --> chainde de caractere à rechercher
-            contexte (int) --> le nombre de caractere à prendre autour du str find
-        OUTPUT :
-            (DataFrame) --> un dtaaframe pandas avec 3 colonnes
+        Construit un concordancier (TD6 1.2).
         """
-        pattern = rf"(.{{0,{contexte}}})\b({re.escape(find)})\b(.{{0,{contexte}}})"
+        if not hasattr(self, 'textOnOneLine'):
+            self.textOnOneLine = " ".join([d.texte for d in self.docs.values()])
 
-        matches = re.findall(pattern, self.textOnOneLine, flags=re.IGNORECASE)
+        # On cherche l'expression avec re.finditer
+        pattern = re.compile(f"(.{{0,{contexte}}})({expression})(.{{0,{contexte}}})")
+        matches = pattern.finditer(self.textOnOneLine)
 
-        df = pd.DataFrame(matches, columns=["contexte_gauche", "motif", "contexte_droit"])
-        return df
+        res = []
+        for m in matches:
+            res.append({
+                "contexte gauche": m.group(1),
+                "motif trouvé": m.group(2),
+                "contexte droit": m.group(3)
+            })
+        return pd.DataFrame(res)
 
     def nettoyer_texte(self, texte):
         """
-        INFO :
-            Nettoie un texte : minuscules, supprime ponctuation, chiffres, sauts de ligne.
+        Nettoie le texte selon les consignes du TD6.
         INPUT :
-            self (Corpus) --> Objet qui contient tout les documents
-            texte (str) --> Le texte à nettoyer
+            texte (str)
         OUTPUT :
-            (DataFrame) --> Un dtaaframe pandas avec 3 colonnes
+            texte nettoyé (str)
         """
+        # 1. Mise en minuscules
         texte = texte.lower()
-        texte = texte.replace("\n", " ")
-        texte = re.sub(r"[^\w\s]", " ", texte)  # retire la ponctuation
-        texte = re.sub(r"\d+", " ", texte)       # retire les chiffres
-        texte = re.sub(r"\s+", " ", texte)       # espaces multiples --> un seul
-        return texte.strip()
+        # 2. Remplacement des passages à la ligne par des espaces
+        texte = texte.replace('\n', ' ')
+        # 3. Suppression de la ponctuation et des chiffres
+        texte = re.sub(r'[^a-z\s]', '', texte)
+        # 4. Suppression des espaces multiples
+        texte = re.sub(r'\s+', ' ', texte).strip()
+        return texte
 
     def construire_vocabulaire(self):
         """
@@ -362,10 +370,7 @@ class Corpus :
     def __repr__(self):
         """
         Fournit une représentation du corpus.
-        OUTPUT : (str)
+        OUTPUT :
+            (str)
         """
         return f"Corpus(sujet='{self.subject}', nb_documents={len(self.docs)}, nb_auteurs={len(self.authors)})"
-
-
-my_corpus = Corpus("Quantum")
-print(f"Représentation du corpus : {my_corpus}")

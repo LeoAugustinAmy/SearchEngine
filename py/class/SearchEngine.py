@@ -120,25 +120,26 @@ class SearchEngine :
 
     def __query_to_vector(self, mots):
         """
-        Transforme une requête en vecteur TF-IDF (même logique que les docs).
+        Transforme la requête utilisateur en vecteur TF-IDF.
         """
+        # Nettoyer la requête comme les documents
+        mots_nettoyes = self.corpus.nettoyer_texte(mots).split()
         vec = np.zeros(len(self.vocab))
 
-        propre = self.corpus.nettoyer_texte(" ".join(mots))
-        mots_req = propre.split()
-
-        compteur = {}
-        for m in mots_req:
+        # Calcul du TF dans la requête
+        counts = {}
+        for m in mots_nettoyes:
             if m in self.word2id:
-                compteur[m] = compteur.get(m, 0) + 1
+                counts[m] = counts.get(m, 0) + 1
 
-        for m, tf in compteur.items():
+        # Transformation en TF-IDF
+        for m, count in counts.items():
             j = self.word2id[m]
+            tf = count
+            # Utiliser le DF stocké dans le vocabulaire pour le calcul de l'IDF
             df = self.vocab[m]["df"]
-
-            if df > 0:
-                idf = math.log(self.nb_docs / df)
-                vec[j] = tf * idf
+            idf = math.log(self.nb_docs / (df + 1)) # +1 pour éviter division par 0
+            vec[j] = tf * idf
 
         return vec
 
@@ -164,7 +165,6 @@ class SearchEngine :
     def search(self, mots, k=5): # ne fonctionne pas, à réparer, le score semble avoir un problème
         """
         Renvoie les k documents les plus proches d’une requête.
-        Conformes aux instructions du TD.
         """
         vq = self.__query_to_vector(mots)
         scores = []
@@ -188,5 +188,3 @@ class SearchEngine :
 c = Corpus("Trump")
 se = SearchEngine(c)
 print(se.search("PUBLIC SERVICE ANNOUNCEMENT"))
-
-#TODO : repair search
