@@ -183,8 +183,3 @@ class SearchEngine :
 
         df = df.sort_values(by="score", ascending=False)
         return df.head(k)
-
-# Test
-c = Corpus("Trump")
-se = SearchEngine(c)
-print(se.search("PUBLIC SERVICE ANNOUNCEMENT"))

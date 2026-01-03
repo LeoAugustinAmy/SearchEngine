@@ -9,20 +9,31 @@ from Author import Author
 import re
 
 class Corpus :
-    def __init__(self, subject, file_path=None):
-        """
-        Initialise le corpus. Charge depuis un JSON si file_path est fourni,
-        sinon interroge les API.
-        """
+    def __init__(self, subject, file_path=None, dataframe=None):
         self.subject = subject
         self.authors = {}
         self.docs = {}
+        self.last_id = 0 # Initialisation de l'ID
+
         if file_path:
             self.load_json(file_path)
+        elif dataframe is not None:
+            self.nb_docs = 0
+            print(f"Corpus '{subject}' initialisé vide pour chargement CSV.")
         else:
+            # Cas par défaut : recherche API
             self.docs, self.authors, self.nb_docs = self.__getDocsWithSubject(self.subject)
-        self.last_id = 0
-        self.textOnOneLine = self.getOneLineOfText()
+
+        if self.docs:
+            self.textOnOneLine = self.getOneLineOfText()
+        else:
+            self.textOnOneLine = ""
+
+    # Ajoute aussi cette petite méthode pour faciliter l'ajout manuel
+    def add(self, doc):
+        self.docs[self.last_id] = doc
+        self.last_id += 1
+        self.nb_docs = len(self.docs)
 
 
     def __getDocsWithSubject(self, subject: str) :
